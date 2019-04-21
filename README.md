@@ -9,9 +9,9 @@
 experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://www.tidyverse.org/lifecycle/#experimental)
 <!-- badges: end -->
 
-Read in the report (downloaded as CSV from
-[Factbase](https://%20f2.link/mr-sheet)). The Factbase version of the
-report has been human-reviewed to fix errors in the OCR process.
+This code chunk reads in the text from the report (downloaded as CSV
+from [Factbase](https://%20f2.link/mr-sheet)). The Factbase version of
+the report has been human-reviewed to fix errors in the OCR process.
 
 ``` r
 report <- read_csv(
@@ -53,18 +53,25 @@ tidy_report <- report %>%
   unnest_tokens(output = word, input = text)
 
 tidy_report %>%
-  head() %>%
+  top_n(10) %>%
   knitr::kable()
+#> Selecting by word
 ```
 
-| page | word          |
-| ---: | :------------ |
-|    1 | report        |
-|    1 | on            |
-|    1 | the           |
-|    1 | investigation |
-|    1 | into          |
-|    1 | russian       |
+| page | word       |
+| ---: | :--------- |
+|  142 | zwaan      |
+|  142 | zwaan      |
+|  142 | zwaan      |
+|  142 | zwaan      |
+|  146 | zone       |
+|  228 | zubrin     |
+|  384 | zivotofsky |
+|  384 | zivotofsky |
+|  385 | zivotofsky |
+|  391 | zone       |
+|  410 | zwaan      |
+|  448 | zwaan      |
 
 The report has 197,140 words across 448 pages.
 
@@ -122,3 +129,112 @@ report_sentiment %>%
 ```
 
 <img src="man/figures/README-unnamed-chunk-4-1.png" width="100%" />
+
+### Principal component analysis
+
+This code chunk converts the tidy report to a sparse matrix with each
+row representing a page, each column for the words, and the values being
+the term-frequency inverse document-frequency value.
+
+``` r
+sparse_word_matrix <- tidy_report %>%
+  count(page, word) %>%
+  bind_tf_idf(word, page, n) %>%
+  cast_sparse(page, word, tf_idf)
+```
+
+This code chunk fits a principal components analysis using the sparse
+matrix from the previous step.
+
+``` r
+words_pca <- irlba::prcomp_irlba(
+  x = sparse_word_matrix,
+  n = 64,
+  scale. = TRUE
+)
+```
+
+This plot shows the proportion of variance explained by each of the top
+10 principal components:
+
+``` r
+summary(words_pca)$importance[2,1:64] %>%
+  enframe(.) %>%
+  mutate(
+    name = fct_reorder(factor(name), desc(value))
+  ) %>%
+  top_n(10) %>%
+  ggplot(aes(x = name, y = value, fill = name)) +
+  geom_bar(stat = "identity") +
+  scale_y_continuous(name = "Proportion of variance explained") +
+  scale_x_discrete("") +
+  guides(fill = FALSE) +
+  theme_minimal()
+#> Selecting by value
+```
+
+<img src="man/figures/README-unnamed-chunk-7-1.png" width="100%" />
+
+This next code chunk “tidies” the PCA so that each row corresponds to
+the contribution of each word to each principal component.
+
+``` r
+tidied_pca <- bind_cols(
+  word = sparse_word_matrix@Dimnames[[2]],
+  broom::tidy(words_pca$rotation)
+  ) %>%
+  gather(PC, Contribution, PC1:PC64)
+#> Warning: 'tidy.matrix' is deprecated.
+#> See help("Deprecated")
+
+tidied_pca %>%
+  top_n(10) %>%
+  knitr::kable()
+#> Selecting by Contribution
+```
+
+| word          | PC  | Contribution |
+| :------------ | :-- | -----------: |
+| ae            | PC4 |    0.1224969 |
+| ar            | PC4 |    0.1224969 |
+| consultations | PC4 |    0.1224969 |
+| efflmaton     | PC4 |    0.1224969 |
+| er            | PC4 |    0.1224969 |
+| fm            | PC4 |    0.1224969 |
+| frames        | PC4 |    0.1224969 |
+| iegspt        | PC4 |    0.1224969 |
+| landan        | PC4 |    0.1224969 |
+| meetoy        | PC4 |    0.1224969 |
+| ofry          | PC4 |    0.1224969 |
+| spore         | PC4 |    0.1224969 |
+| te            | PC4 |    0.1224969 |
+
+This plot shows the words with the highest contribution to each of the
+top 4 principal components.
+
+``` r
+tidied_pca %>%
+  mutate(
+    word = factor(word)
+  ) %>%
+  filter(PC %in% paste0("PC", 1:4)) %>%
+  group_by(PC) %>%
+  top_n(30, abs(Contribution)) %>%
+  mutate(word = reorder(word, Contribution)) %>%
+  ungroup() %>%
+  ggplot(aes(word, Contribution, fill = word)) +
+  geom_col(show.legend = FALSE, alpha = 0.8) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), 
+    axis.ticks.x = element_blank()
+  ) +
+  labs(
+    x = "Words",
+    y = "Relative importance in principle component"
+  ) +
+  facet_wrap(~ PC, ncol = 2, scales = "free_y") +
+  coord_flip()
+```
+
+<img src="man/figures/README-unnamed-chunk-9-1.png" width="100%" />
