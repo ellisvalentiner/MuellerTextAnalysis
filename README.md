@@ -45,7 +45,7 @@ report %>%
 |    5 | \[Table of Contents\]                                                                                                                                                                                     | NA         | NA |
 
 This code chunk converts the report to a “tidy report” where each row is
-a word.
+a token.
 
 ``` r
 tidy_report <- report %>%
@@ -73,7 +73,62 @@ tidy_report %>%
 |  410 | zwaan      |
 |  448 | zwaan      |
 
-The report has 197,140 words across 448 pages.
+Tokens are words, letters, numbers, symbols, etc.
+
+### Token Count
+
+The report has 197,140 tokens across 448 pages.
+
+This plot shows the number of tokens per page:
+
+``` r
+tidy_report %>%
+  count(page) %>%
+  ggplot(aes(x = page, y = n, fill = n)) +
+  geom_bar(stat = "identity") +
+  scale_x_continuous("Page") +
+  scale_y_continuous("Token Count") +
+  scale_fill_viridis_c(option = "C") +
+  guides(fill = FALSE) +
+  theme_minimal()
+```
+
+<img src="man/figures/README-unnamed-chunk-3-1.png" width="100%" />
+
+Here are the top 10 tokens with stopwords (e.g. the, at, of, etc.)
+removed:
+
+``` r
+tidy_report %>%
+  count(word) %>%
+  arrange(desc(n)) %>%
+  anti_join(stop_words, by = "word") %>%
+  top_n(10) %>%
+  mutate(
+    n = scales::comma(n)
+  ) %>%
+  knitr::kable(.)
+#> Selecting by n
+```
+
+| word      | n     |
+| :-------- | :---- |
+| footnote  | 2,085 |
+| president | 1,811 |
+| 302       | 1,732 |
+| trump     | 1,403 |
+| 18        | 1,357 |
+| 17        | 1,317 |
+| 2         | 842   |
+| 1         | 801   |
+| campaign  | 801   |
+| 3         | 789   |
+
+In the report Russia (e.g. Russian, Russia’s, etc.) is mentioned 1,502
+times, Trump (e.g. Trump’s, etc.) is mentioned 1,592 times, and
+impeachment is mentioned 11 times.
+
+There are 471 references to “harm to ongoing matter”.
 
 ### Sentiment analysis
 
@@ -128,7 +183,7 @@ report_sentiment %>%
   theme_minimal()
 ```
 
-<img src="man/figures/README-unnamed-chunk-4-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-6-1.png" width="100%" />
 
 ### Principal component analysis
 
@@ -173,7 +228,7 @@ summary(words_pca)$importance[2,1:64] %>%
 #> Selecting by value
 ```
 
-<img src="man/figures/README-unnamed-chunk-7-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-9-1.png" width="100%" />
 
 This next code chunk “tidies” the PCA so that each row corresponds to
 the contribution of each word to each principal component.
@@ -237,4 +292,4 @@ tidied_pca %>%
   coord_flip()
 ```
 
-<img src="man/figures/README-unnamed-chunk-9-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-11-1.png" width="100%" />

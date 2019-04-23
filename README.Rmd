@@ -49,7 +49,7 @@ report %>%
   knitr::kable()
 ```
 
-This code chunk converts the report to a "tidy report" where each row is a word.
+This code chunk converts the report to a "tidy report" where each row is a token.
 
 ```{r}
 tidy_report <- report %>%
@@ -61,7 +61,43 @@ tidy_report %>%
   knitr::kable()
 ```
 
-The report has `r tidy_report %>% count() %>% pull(n) %>% scales::comma()` words across `r tidy_report %>% count(page) %>% count() %>% pull(n)` pages.
+Tokens are words, letters, numbers, symbols, etc.
+
+### Token Count
+
+The report has `r tidy_report %>% count() %>% pull(n) %>% scales::comma()` tokens across `r tidy_report %>% count(page) %>% count() %>% pull(n)` pages.
+
+This plot shows the number of tokens per page:
+
+```{r}
+tidy_report %>%
+  count(page) %>%
+  ggplot(aes(x = page, y = n, fill = n)) +
+  geom_bar(stat = "identity") +
+  scale_x_continuous("Page") +
+  scale_y_continuous("Token Count") +
+  scale_fill_viridis_c(option = "C") +
+  guides(fill = FALSE) +
+  theme_minimal()
+```
+
+Here are the top 10 tokens with stopwords (e.g. the, at, of, etc.) removed:
+
+```{r}
+tidy_report %>%
+  count(word) %>%
+  arrange(desc(n)) %>%
+  anti_join(stop_words, by = "word") %>%
+  top_n(10) %>%
+  mutate(
+    n = scales::comma(n)
+  ) %>%
+  knitr::kable(.)
+```
+
+In the report Russia (e.g. Russian, Russia's, etc.) is mentioned `r tidy_report %>% filter(str_detect(word, "russia")) %>% count() %>% pull() %>% scales::comma(.)` times, Trump (e.g. Trump's, etc.) is mentioned `r tidy_report %>% filter(str_detect(word, "trump")) %>% count() %>% pull() %>% scales::comma(.)` times, and impeachment is mentioned `r tidy_report %>% filter(str_detect(word, "impeach")) %>% count() %>% pull() %>% scales::comma(.)` times.
+
+There are `r report %>% unnest_tokens(ngram, text, token = "ngrams", n = 4) %>% count(ngram) %>% filter(ngram == "harm to ongoing matter") %>% pull(n)` references to "harm to ongoing matter".
 
 ### Sentiment analysis
 
